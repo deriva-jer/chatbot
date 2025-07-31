@@ -41,36 +41,16 @@ except Exception as e:
     st.error(f"Bedrock Client Error: {e}")
     st.stop()
 
+
 # --- Prompt Format ---
 INSTRUCTIONAL_PREFIX = """
-Based on the following retrieved information and the user's query, please provide the most relevant details about charging guidelines.
-Specifically, extract and present the following information in a bulleted list format, with each item on a new line, enter, having space between each bullet point:
-
--   **Description:** A concise summary of the charging activity or guideline.\n
--   **Account number:** The associated account number.\n
--   **Location:** The relevant location for this guideline/activity.\n
--   **Company ID:** The company identification number.\n
--   **Project:** The project name or code.\n
--   **Department:** The department responsible or associated with this.\n
-
-If any of these specific pieces of information are not found in the retrieved context, please state "N/A" or "Not applicable" for that item.
-Do not include any other conversational text or preamble; just the bulleted list.
-
-In addition, please ensure that the response is formatted in a way that is easy to read and understand, with clear separation between each bullet point.
-
-In addition, add a sentence or two at the end of the response for any relevant information that may not fit into the bullet points, but is still important for the user to know.
-
-""" # Added extra newline for better separation, though not strictly necessary if you rely on the model.
-
-# # --- Prompt Format ---
-# INSTRUCTIONAL_PREFIX = """
-# Based on the following retrieved information and the user's query, please provide the most relevant details about charging guidelines.\n\nExtract and present the following in a markdown bulleted list:\n\n- **Description:**\n- **Account number:**\n- **Location:**\n- **Company ID:**\n- **Project:**\n- **Department:**\n\nIf not available, return \"N/A\".\n\nFinish with 1–2 relevant notes if needed.
-# """
+Based on the following retrieved information and the user's query, please provide the most relevant details about charging guidelines.\n\nExtract and present the following in a markdown bulleted list:\n\n- **Description:**\n- **Account number:**\n- **Location:**\n- **Company ID:**\n- **Project:**\n- **Department:**\n\nIf not available, return \"N/A\".\n\nFinish with 1-2 relevant notes if needed.
+"""
 
 # --- Chat Interface ---  ⚡
 # st.title("Diva The Chatbot!")
 st.markdown("<h1 style='text-align: center;'>⚡Meet Diva!</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Your AI Assistant for Charging Guidelines.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Deriva's AI Chatbot for Charging Guidelines.</p>", unsafe_allow_html=True)
 
 # Render chat history
 for msg in st.session_state.chat_history:
@@ -110,7 +90,7 @@ if st.session_state.chat_history and st.session_state.chat_history[-1]["content"
 
 # --- Footer ---
 st.divider()
-# st.caption("Diva The Chatbot is made by Deriva Energy and is for internal use only. It may contain errors.")
+# st.caption("Tip: For better outputs, mention what team you're in.")
 
 
 footer="""<style>
