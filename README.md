@@ -7,3 +7,4 @@
 # Running on EC2
 1. `git clone` this repo
 2. `nohup streamlit run app.py --server.port 80 --server.address 0.0.0.0`
+3. To stop it, `sudo lsof -i :80`, and then `sudo kill -9 [the PID]`
