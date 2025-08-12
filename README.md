@@ -22,3 +22,13 @@ Bedrock -> knowledge base - index \
 DynamoDB -> memory/database \
 Python script -> Streamlit app \
 EC2 -> Instances - server - host the app
+
+---
+
+**Deployment videos**
+- https://www.youtube.com/watch?v=oynd7Xv2i9Y
+- https://www.youtube.com/watch?v=DflWqmppOAg
+
+**Creating history langchain with dynamodb**
+- https://python.langchain.com/v0.2/docs/integrations/memory/aws_dynamodb/
+- https://aws.amazon.com/blogs/database/build-a-scalable-context-aware-chatbot-with-amazon-dynamodb-amazon-bedrock-and-langchain/
