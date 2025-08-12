@@ -9,13 +9,16 @@
 2. `nohup streamlit run app.py --server.port 80 --server.address 0.0.0.0`
 3. To stop it, `sudo lsof -i :80`, and then `sudo kill -9 [the PID]`
 
-Some more notes:
+---
+
+**Some more notes:**
+
 For AWS inquiry: Sandeep
 
 Finance: Gavin Humphrey
 
-S3 - data
-Bedrock -> knowledge base - index
-DynamoDB -> memory/database
-Python script -> Streamlit app
+S3 - data \
+Bedrock -> knowledge base - index \
+DynamoDB -> memory/database \
+Python script -> Streamlit app \
 EC2 -> Instances - server - host the app
