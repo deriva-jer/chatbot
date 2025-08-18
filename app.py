@@ -282,131 +282,131 @@ router_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
-# def route_turn(user_input: str) -> Dict:
-#     try:
-#         mv = memory.load_memory_variables({})
-#         # Use a simpler approach - just pass the messages directly without cleaning
-#         msgs = router_prompt.format_messages(chat_history=mv.get("chat_history", []), input=user_input)
-#         resp = chat_model.invoke(msgs)
-        
-#         # Clean up the response content and try to parse JSON
-#         content = resp.content.strip()
-        
-#         # Remove any markdown code block formatting
-#         if content.startswith("```json"):
-#             content = content[7:]
-#         if content.startswith("```"):
-#             content = content[3:]
-#         if content.endswith("```"):
-#             content = content[:-3]
-        
-#         # Remove any leading/trailing whitespace and newlines
-#         content = content.strip()
-        
-#         # Try to find JSON in the content
-#         import re
-#         json_match = re.search(r'\{.*\}', content, re.DOTALL)
-#         if json_match:
-#             content = json_match.group()
-        
-#         data = json.loads(content)
-#         if "intent" in data and data["intent"] in ("clarify", "answer"):
-#             return data
-#     except Exception as e:
-#         # Remove the warning message and just silently default to answer
-#         pass
-    
-#     # Default fallback
-#     return {"intent": "answer", "questions": [], "known": {}, "notes": ""}
-
-
 def route_turn(user_input: str) -> Dict:
-    # quick greeting check (let greetings bypass clarification)
-    text = (user_input or "").strip().lower()
-    GREETINGS = {"hi", "hello", "hey", "yo", "hiya", "good morning", "good afternoon", "good evening"}
-    if text in GREETINGS or any(text.startswith(g) for g in GREETINGS):
-        return {"intent": "answer", "questions": [], "known": {"reason": "greeting"}, "notes": ""}
-
     try:
         mv = memory.load_memory_variables({})
+        # Use a simpler approach - just pass the messages directly without cleaning
         msgs = router_prompt.format_messages(chat_history=mv.get("chat_history", []), input=user_input)
         resp = chat_model.invoke(msgs)
+        
+        # Clean up the response content and try to parse JSON
         content = resp.content.strip()
-
-        # strip code fences if present
+        
+        # Remove any markdown code block formatting
         if content.startswith("```json"):
             content = content[7:]
         if content.startswith("```"):
             content = content[3:]
         if content.endswith("```"):
             content = content[:-3]
+        
+        # Remove any leading/trailing whitespace and newlines
         content = content.strip()
+        
+        # Try to find JSON in the content
+        import re
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            content = json_match.group()
+        
+        data = json.loads(content)
+        if "intent" in data and data["intent"] in ("clarify", "answer"):
+            return data
+    except Exception as e:
+        # Remove the warning message and just silently default to answer
+        pass
+    
+    # Default fallback
+    return {"intent": "answer", "questions": [], "known": {}, "notes": ""}
 
-        import re, json as _json
-        m = re.search(r'\{.*\}', content, re.DOTALL)
-        if m:
-            data = _json.loads(m.group())
-        else:
-            data = _json.loads(content)
 
-        # Safety guard: enforce clarify-first unless we have enough info
-        intent = data.get("intent", "clarify")
-        known = data.get("known", {}) or {}
+# def route_turn(user_input: str) -> Dict:
+#     # quick greeting check (let greetings bypass clarification)
+#     text = (user_input or "").strip().lower()
+#     GREETINGS = {"hi", "hello", "hey", "yo", "hiya", "good morning", "good afternoon", "good evening"}
+#     if text in GREETINGS or any(text.startswith(g) for g in GREETINGS):
+#         return {"intent": "answer", "questions": [], "known": {"reason": "greeting"}, "notes": ""}
 
-        # Determine sufficiency of known fields
-        team = (known.get("team") or "").strip().lower()
-        asset_type = (known.get("asset_type") or "").strip().lower()
-        site = (known.get("site") or "").strip()
+#     try:
+#         mv = memory.load_memory_variables({})
+#         msgs = router_prompt.format_messages(chat_history=mv.get("chat_history", []), input=user_input)
+#         resp = chat_model.invoke(msgs)
+#         content = resp.content.strip()
 
-        # Minimal sufficiency rule:
-        # - If team is not provided → clarify
-        # - If team is Operations and asset_type missing → clarify
-        # - Otherwise allow answer
-        sufficient = False
-        if team:
-            if team == "operations":
-                sufficient = bool(asset_type)
-            else:
-                sufficient = True  # non-Operations answers usually don't need asset_type
+#         # strip code fences if present
+#         if content.startswith("```json"):
+#             content = content[7:]
+#         if content.startswith("```"):
+#             content = content[3:]
+#         if content.endswith("```"):
+#             content = content[:-3]
+#         content = content.strip()
 
-        if intent == "answer" and not sufficient:
-            # Flip to clarify with targeted questions
-            questions = []
-            if not team:
-                questions.append("which team you're with (Operations, Engineering, Finance, or IT)")
-            if team == "operations" and not asset_type:
-                questions.append("if it's for Wind, Solar, or Battery (and the site/plant if applicable)")
-            if not questions:
-                questions = ["which team you're with (Operations, Engineering, Finance, or IT)",
-                             "if it's for Wind, Solar, or Battery (and the site/plant if applicable)"]
-            return {"intent": "clarify", "questions": questions[:2], "known": known, "notes": "insufficient context"}
+#         import re, json as _json
+#         m = re.search(r'\{.*\}', content, re.DOTALL)
+#         if m:
+#             data = _json.loads(m.group())
+#         else:
+#             data = _json.loads(content)
 
-        # Default to clarify-first if model didn’t explicitly decide
-        if intent not in ("clarify", "answer"):
-            intent = "clarify"
+#         # Safety guard: enforce clarify-first unless we have enough info
+#         intent = data.get("intent", "clarify")
+#         known = data.get("known", {}) or {}
 
-        # Strong default: if still uncertain, clarify
-        if intent == "answer" and not sufficient:
-            intent = "clarify"
+#         # Determine sufficiency of known fields
+#         team = (known.get("team") or "").strip().lower()
+#         asset_type = (known.get("asset_type") or "").strip().lower()
+#         site = (known.get("site") or "").strip()
 
-        return {
-            "intent": intent,
-            "questions": data.get("questions", [])[:2],
-            "known": known,
-            "notes": data.get("notes", "")
-        }
+#         # Minimal sufficiency rule:
+#         # - If team is not provided → clarify
+#         # - If team is Operations and asset_type missing → clarify
+#         # - Otherwise allow answer
+#         sufficient = False
+#         if team:
+#             if team == "operations":
+#                 sufficient = bool(asset_type)
+#             else:
+#                 sufficient = True  # non-Operations answers usually don't need asset_type
 
-    except Exception:
-        # Fallback: clarify-first with sensible default questions
-        return {
-            "intent": "clarify",
-            "questions": [
-                "which team you're with (Operations, Engineering, Finance, or IT)",
-                "if it’s for Wind, Solar, or Battery (and the site/plant if applicable)"
-            ],
-            "known": {},
-            "notes": "router_exception_fallback"
-        }
+#         if intent == "answer" and not sufficient:
+#             # Flip to clarify with targeted questions
+#             questions = []
+#             if not team:
+#                 questions.append("which team you're with (Operations, Engineering, Finance, or IT)")
+#             if team == "operations" and not asset_type:
+#                 questions.append("if it's for Wind, Solar, or Battery (and the site/plant if applicable)")
+#             if not questions:
+#                 questions = ["which team you're with (Operations, Engineering, Finance, or IT)",
+#                              "if it's for Wind, Solar, or Battery (and the site/plant if applicable)"]
+#             return {"intent": "clarify", "questions": questions[:2], "known": known, "notes": "insufficient context"}
+
+#         # Default to clarify-first if model didn’t explicitly decide
+#         if intent not in ("clarify", "answer"):
+#             intent = "clarify"
+
+#         # Strong default: if still uncertain, clarify
+#         if intent == "answer" and not sufficient:
+#             intent = "clarify"
+
+#         return {
+#             "intent": intent,
+#             "questions": data.get("questions", [])[:2],
+#             "known": known,
+#             "notes": data.get("notes", "")
+#         }
+
+#     except Exception:
+#         # Fallback: clarify-first with sensible default questions
+#         return {
+#             "intent": "clarify",
+#             "questions": [
+#                 "which team you're with (Operations, Engineering, Finance, or IT)",
+#                 "if it’s for Wind, Solar, or Battery (and the site/plant if applicable)"
+#             ],
+#             "known": {},
+#             "notes": "router_exception_fallback"
+#         }
 
 
 # --- Answer Prompt (only for final answers) ---
