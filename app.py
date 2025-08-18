@@ -282,131 +282,134 @@ router_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
-def route_turn(user_input: str) -> Dict:
-    try:
-        mv = memory.load_memory_variables({})
-        # Use a simpler approach - just pass the messages directly without cleaning
-        msgs = router_prompt.format_messages(chat_history=mv.get("chat_history", []), input=user_input)
-        resp = chat_model.invoke(msgs)
-        
-        # Clean up the response content and try to parse JSON
-        content = resp.content.strip()
-        
-        # Remove any markdown code block formatting
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        
-        # Remove any leading/trailing whitespace and newlines
-        content = content.strip()
-        
-        # Try to find JSON in the content
-        import re
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        if json_match:
-            content = json_match.group()
-        
-        data = json.loads(content)
-        if "intent" in data and data["intent"] in ("clarify", "answer"):
-            return data
-    except Exception as e:
-        # Remove the warning message and just silently default to answer
-        pass
-    
-    # Default fallback
-    return {"intent": "answer", "questions": [], "known": {}, "notes": ""}
-
-
 # def route_turn(user_input: str) -> Dict:
-#     # quick greeting check (let greetings bypass clarification)
-#     text = (user_input or "").strip().lower()
-#     GREETINGS = {"hi", "hello", "hey", "yo", "hiya", "good morning", "good afternoon", "good evening"}
-#     if text in GREETINGS or any(text.startswith(g) for g in GREETINGS):
-#         return {"intent": "answer", "questions": [], "known": {"reason": "greeting"}, "notes": ""}
-
 #     try:
 #         mv = memory.load_memory_variables({})
+#         # Use a simpler approach - just pass the messages directly without cleaning
 #         msgs = router_prompt.format_messages(chat_history=mv.get("chat_history", []), input=user_input)
 #         resp = chat_model.invoke(msgs)
+        
+#         # Clean up the response content and try to parse JSON
 #         content = resp.content.strip()
-
-#         # strip code fences if present
+        
+#         # Remove any markdown code block formatting
 #         if content.startswith("```json"):
 #             content = content[7:]
 #         if content.startswith("```"):
 #             content = content[3:]
 #         if content.endswith("```"):
 #             content = content[:-3]
+        
+#         # Remove any leading/trailing whitespace and newlines
 #         content = content.strip()
+        
+#         # Try to find JSON in the content
+#         import re
+#         json_match = re.search(r'\{.*\}', content, re.DOTALL)
+#         if json_match:
+#             content = json_match.group()
+        
+#         data = json.loads(content)
+#         if "intent" in data and data["intent"] in ("clarify", "answer"):
+#             return data
+#     except Exception as e:
+#         # Remove the warning message and just silently default to answer
+#         pass
+    
+#     # Default fallback
+#     return {"intent": "answer", "questions": [], "known": {}, "notes": ""}
 
-#         import re, json as _json
-#         m = re.search(r'\{.*\}', content, re.DOTALL)
-#         if m:
-#             data = _json.loads(m.group())
-#         else:
-#             data = _json.loads(content)
+def route_turn(user_input: str) -> Dict:
+    import re, json as _json
 
-#         # Safety guard: enforce clarify-first unless we have enough info
-#         intent = data.get("intent", "clarify")
-#         known = data.get("known", {}) or {}
+    # 0) Quick greeting bypass
+    text_raw = (user_input or "").strip()
+    text = text_raw.lower()
+    GREETINGS = {"hi", "hello", "hey", "yo", "hiya", "good morning", "good afternoon", "good evening"}
+    if text in GREETINGS or any(text.startswith(g) for g in GREETINGS):
+        return {"intent": "answer", "questions": [], "known": {"reason": "greeting"}, "notes": ""}
 
-#         # Determine sufficiency of known fields
-#         team = (known.get("team") or "").strip().lower()
-#         asset_type = (known.get("asset_type") or "").strip().lower()
-#         site = (known.get("site") or "").strip()
+    # 1) Heuristic: detect explicit team in the current input (so we don't rely solely on the LLM)
+    TEAM_KEYWORDS = {
+        "it": "IT",
+        "finance": "Finance",
+        "engineering": "Engineering",
+        "ops": "Operations",
+        "operations": "Operations",
+        "data analytics": "IT",  # treat as IT umbrella; you can specialize later
+    }
+    team_guess = None
+    for kw, norm in TEAM_KEYWORDS.items():
+        if re.search(rf"\b{re.escape(kw)}\b", text):
+            team_guess = norm
+            break
 
-#         # Minimal sufficiency rule:
-#         # - If team is not provided → clarify
-#         # - If team is Operations and asset_type missing → clarify
-#         # - Otherwise allow answer
-#         sufficient = False
-#         if team:
-#             if team == "operations":
-#                 sufficient = bool(asset_type)
-#             else:
-#                 sufficient = True  # non-Operations answers usually don't need asset_type
+    # 2) Ask the LLM router (for broader detection like site or asset_type)
+    try:
+        mv = memory.load_memory_variables({})
+        msgs = router_prompt.format_messages(chat_history=mv.get("chat_history", []), input=user_input)
+        resp = chat_model.invoke(msgs)
+        content = resp.content.strip()
 
-#         if intent == "answer" and not sufficient:
-#             # Flip to clarify with targeted questions
-#             questions = []
-#             if not team:
-#                 questions.append("which team you're with (Operations, Engineering, Finance, or IT)")
-#             if team == "operations" and not asset_type:
-#                 questions.append("if it's for Wind, Solar, or Battery (and the site/plant if applicable)")
-#             if not questions:
-#                 questions = ["which team you're with (Operations, Engineering, Finance, or IT)",
-#                              "if it's for Wind, Solar, or Battery (and the site/plant if applicable)"]
-#             return {"intent": "clarify", "questions": questions[:2], "known": known, "notes": "insufficient context"}
+        # strip code fences if present
+        if content.startswith("```json"):
+            content = content[7:]
+        if content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
 
-#         # Default to clarify-first if model didn’t explicitly decide
-#         if intent not in ("clarify", "answer"):
-#             intent = "clarify"
+        m = re.search(r'\{.*\}', content, re.DOTALL)
+        data = _json.loads(m.group() if m else content)
+    except Exception:
+        data = {"intent": "clarify", "questions": [], "known": {}, "notes": "router_exception_fallback"}
 
-#         # Strong default: if still uncertain, clarify
-#         if intent == "answer" and not sufficient:
-#             intent = "clarify"
+    # 3) Consolidate knowns (prefer explicit user hint)
+    known = data.get("known", {}) or {}
+    if team_guess and not known.get("team"):
+        known["team"] = team_guess
 
-#         return {
-#             "intent": intent,
-#             "questions": data.get("questions", [])[:2],
-#             "known": known,
-#             "notes": data.get("notes", "")
-#         }
+    team = (known.get("team") or "").strip().lower()
+    asset_type = (known.get("asset_type") or "").strip().lower()
+    site = (known.get("site") or "").strip()
 
-#     except Exception:
-#         # Fallback: clarify-first with sensible default questions
-#         return {
-#             "intent": "clarify",
-#             "questions": [
-#                 "which team you're with (Operations, Engineering, Finance, or IT)",
-#                 "if it’s for Wind, Solar, or Battery (and the site/plant if applicable)"
-#             ],
-#             "known": {},
-#             "notes": "router_exception_fallback"
-#         }
+    # 4) Compute what’s still missing
+    missing_questions = []
+    if not team:
+        missing_questions.append("which team you’re with (Operations, Engineering, Finance, or IT)")
+    if team == "operations" and not asset_type:
+        missing_questions.append("if it’s for Wind, Solar, or Battery")
+    if team == "operations" and not site:
+        # only ask site for Ops to keep it short; include if we still have space
+        missing_questions.append("the site/plant (if applicable)")
+
+    # 5) Sufficiency rule
+    sufficient = False
+    if team:
+        if team == "operations":
+            sufficient = bool(asset_type)  # site can still be asked later in the answer if truly required
+        else:
+            sufficient = True
+
+    # 6) Force **answer** when sufficient, even if the LLM said "clarify"
+    if sufficient:
+        return {
+            "intent": "answer",
+            "questions": [],
+            "known": known,
+            "notes": "forced_answer_minimum_context"
+        }
+
+    # 7) Otherwise clarify with only the missing pieces (max 2)
+    qs = missing_questions[:2] or (data.get("questions", [])[:2] if isinstance(data.get("questions"), list) else [])
+    return {
+        "intent": "clarify",
+        "questions": qs,
+        "known": known,
+        "notes": data.get("notes", "")
+    }
+
 
 
 # --- Answer Prompt (only for final answers) ---
@@ -445,11 +448,27 @@ clarification_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
+
+# def generate_clarification(user_input: str, questions: List[str]) -> str:
+#     """Generate a natural clarifying response - simplified for speed"""
+#     # Use a simple template instead of calling the LLM for speed
+#     q_text = " ".join(questions[:2])  # Join questions naturally
+#     return f"I'd be happy to help! To give you the right charging guidelines, could you tell me {q_text}?"
+
 def generate_clarification(user_input: str, questions: List[str]) -> str:
-    """Generate a natural clarifying response - simplified for speed"""
-    # Use a simple template instead of calling the LLM for speed
-    q_text = " ".join(questions[:2])  # Join questions naturally
-    return f"I'd be happy to help! To give you the right charging guidelines, could you tell me {q_text}?"
+    qs = [q.strip().rstrip("?") for q in (questions or []) if q and q.strip()]
+    if not qs:
+        qs = [
+            "which team you're with (Operations, Engineering, Finance, or IT)",
+            "if it's for Wind, Solar, or Battery—and the site/plant if applicable"
+        ]
+    if len(qs) == 1:
+        q_text = qs[0] + "?"
+    else:
+        q_text = f"{qs[0]} and {qs[1]}?"
+    return f"I can help with that. To point you to the right charging guideline, could you tell me {q_text}"
+
+
 def generate_answer(user_input: str) -> Dict:
     retrieval = retrieve_from_kb(user_input)
     context = retrieval["context"]
