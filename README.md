@@ -1,3 +1,5 @@
+### Note: Link to [Deriva's Charging Guidelines Excel Sheet](https://derivaenergy.sharepoint.com/:x:/r/sites/DerivaFinance/_layouts/15/Doc.aspx?sourcedoc=%7B3CD9F65D-C693-4CE8-904C-91074451F098%7D&file=Deriva%20OM%20Charging%20Guidelines.xlsx&wdOrigin=TEAMS-MAGLEV.p2p_ns.rwc&action=default&mobileredirect=true)
+
 ## Running Locally Simplified
 
 1. Don't forget to get the correct credentials from aws.
