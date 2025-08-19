@@ -24,6 +24,7 @@
 You should instantly be redirected to the Amazon Linux console. Then type in the command `sudo su -`
 
 ## How to Update the App (including if the repository is not in Jeremy's Github anymore)
+0. You must always be in `sudo su -`
 1. If you need to update the Chatbot, type in `rm -rf chatbot`, or rm -rf [the new folder's name]
 2. Then type in git clone `https://github.com/deriva-jer/chatbot.git` or `git clone [the new github repository link]`
 3. Then type in `cd chatbot` or `cd the new folder's name`.
