@@ -140,7 +140,7 @@ if not create_dynamodb_table_if_not_exists():
     st.stop()
 
 # --- Streamlit Page ---
-st.set_page_config(page_icon = "deriva.jpg", page_title="Diva the Chatbot", layout="centered", initial_sidebar_state="expanded")
+st.set_page_config(page_icon="🤖", page_title="Diva the Chatbot", layout="centered", initial_sidebar_state="expanded")
 
 st.sidebar.title("⚙️ Settings")
 
@@ -212,32 +212,30 @@ def retrieve_from_kb(query: str, max_results: int = 6) -> Dict:
     return {"context": "\n\n---\n\n".join(chunks), "sources": sources}
 
 # --- Clarifying Router ---
-
 ROUTER_POLICY = """
 You are Diva, Deriva's internal charging-guidelines assistant.
-
-DEFAULT: Clarify first for any query about policies, charging, codes, expenses, departments, projects, or sites.
-Only skip clarification for pure greetings or when the message + history already contains all critical fields.
-
+ 
+DEFAULT: Clarify first for any query about policies, charging, codes, expenses, departments, projects, or sites. Only skip clarification for pure greetings or when the message + history already contains all critical fields.
+ 
 Critical fields (generic):
 - team/department (ask: “Which team or department do you work in?”)
 - if the provided team is umbrella-level (e.g., an org name), ask for the specific sub-team/department within it
 - site/plant if policy can vary by site
 - any other column implied by the retrieved context that changes the code (category, activity, etc.)
-
+ 
 Rules:
 1) Greetings → intent: "answer".
 2) Prefer intent: "clarify" and ask at most TWO concise, targeted questions for missing fields.
 3) If prior chat history already contains what's needed, intent: "answer".
 4) Never invent values; if unsure, ask.
 5) Keep questions short and friendly.
-
+ 
 Return ONLY JSON:
 {
   "intent": "clarify" | "answer",
   "questions": ["q1","q2"],
   "known": {"team": "...", "department": "...", "site": "..."},
-  "notes": ""
+  "notes": "if IT, which IT department or team; if operations, is it wind, solar, or battery?"
 }
 """
 
@@ -386,20 +384,26 @@ clarification_prompt = ChatPromptTemplate.from_messages(
 #     q_text = " ".join(questions[:2])  # Join questions naturally
 #     return f"I'd be happy to help! To give you the right charging guidelines, could you tell me {q_text}?"
 
-
-def generate_clarification(user_input: str, questions: List[str]) -> str:
+def generate_clarification(user_input: str, questions: List[str], notes: str = "") -> str:
     qs = [q.strip().rstrip("?") for q in (questions or []) if q and q.strip()]
+    
+    # Use notes to provide specific follow-up questions
+    if "if IT, which IT department or team" in notes.lower() and "it" in user_input.lower():
+        return "I can help with that! To give you the right charging guideline, could you tell me which specific IT department or team you're with?"
+    
+    if "if operations, is it wind, solar, or battery" in notes.lower() and "operations" in user_input.lower():
+        return "I can help with that! Could you specify if this is for Wind, Solar, or Battery Operations?"
+        
     if not qs:
-        qs = [
-            "which team you're with (Operations, Engineering, Finance, or IT)",
-            "if it's for Wind, Solar, or Battery—and the site/plant if applicable"
-        ]
+        # Fallback if no specific questions are generated
+        return "I'd be happy to help! To give you the right charging guidelines, could you tell me which team you're with (Operations, Engineering, Finance, or IT)?"
+        
     if len(qs) == 1:
         q_text = qs[0] + "?"
     else:
         q_text = f"{qs[0]} and {qs[1]}?"
+        
     return f"I can help with that. To point you to the right charging guideline, could you tell me {q_text}"
-
 
 def generate_answer(user_input: str) -> Dict:
     retrieval = retrieve_from_kb(user_input)
@@ -435,15 +439,17 @@ if user_input:
 
     if decision["intent"] == "clarify" and decision.get("questions"):
         # Generate a natural clarifying response
-        clarifier = generate_clarification(user_input, decision["questions"])
-        
+        # Pass the notes from the router's decision
+        clarifier = generate_clarification(user_input, decision["questions"], decision["notes"]) 
+    
         # Save to memory
         memory.chat_memory.add_user_message(user_input)
         memory.chat_memory.add_ai_message(clarifier)
-
+    
         with st.chat_message("assistant"):
             st.markdown(clarifier)
     else:
+    # ... (rest of the code is unchanged)
         with st.chat_message("assistant"):
             with st.spinner("Thinking…"):
                 try:
